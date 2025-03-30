@@ -1,0 +1,328 @@
+#ifndef __WTR_VARIANT_H__
+#define __WTR_VARIANT_H__
+
+#ifdef _DEBUG
+	#include <cassert>
+	#define _VARIANT_ASSERT(x) assert(x)
+#else
+	#define _VARIANT_ASSERT(x)
+#endif
+
+namespace wtr
+{
+	namespace util
+	{
+		template<bool Condition, typename T>
+		struct EnableIf;
+
+		template<typename T>
+		struct EnableIf<true, T>
+		{
+			using Type = T;
+		};
+
+		template<typename T, typename U>
+		struct IsSame
+		{
+			static const bool Value = false;
+		};
+	
+		template<typename T>
+		struct IsSame<T, T>
+		{
+			static const bool Value = true;
+		};
+	
+		template<typename... Args>
+		struct SizeCalculator 
+		{
+			static constexpr size_t value = 0;
+		};
+	
+		template<typename T>
+		struct SizeCalculator<T>
+		{
+			static constexpr size_t value = sizeof(T);
+		};
+	
+		template<typename T, typename... Args>
+		struct SizeCalculator<T, Args...>
+		{
+			static constexpr size_t value = sizeof(T) + SizeCalculator<Args...>::value;
+		};
+	
+		template<typename... Args>
+		constexpr size_t SizeOf()
+		{
+			return SizeCalculator<Args...>::value;
+		}
+	
+		template<typename... Args>
+		struct AlignCalculator 
+		{
+			static constexpr size_t value = 0;
+		};
+	
+		template<typename T>
+		struct AlignCalculator<T>
+		{
+			static constexpr size_t value = alignof(T);
+		};
+	
+		template<typename T, typename... Args>
+		struct AlignCalculator<T, Args...>
+		{
+			static constexpr size_t value = (alignof(T) > AlignCalculator<Args...>::value) ? alignof(T) : AlignCalculator<Args...>::value;
+		};
+	
+		template<typename... Args>
+		constexpr size_t AlignOf() 
+		{
+			return AlignCalculator<Args...>::value;
+		};
+	
+		template<size_t Size, size_t Align>
+		struct AlignedStorage
+		{
+			bool valid;
+			alignas(Align) char data[Size];
+		};
+	
+		template<typename... Args>
+		struct IndexCalculator
+		{
+			static constexpr bool found = false;
+			static constexpr int value = -1;
+		};
+	
+		template<typename T, typename U, typename... Args>
+		struct IndexCalculator<T, U, Args...>
+		{
+			static constexpr bool found = IsSame<T, U>::Value || IndexCalculator<T, Args...>::found;
+			static constexpr int value = (found) ? 1 + IndexCalculator<T, Args...>::value : -1;
+		};
+	
+		template<typename T, typename... Args>
+		constexpr int IndexOf()
+		{
+			return IndexCalculator<T, Args...>::value;
+		}
+
+		template<typename... Ts>
+		struct TypeList {};
+
+		template<typename Storage, typename List>
+		struct DestroyMatcher
+		{
+			static void Destroy(Storage& _storage, const int _index) 
+			{
+				_VARIANT_ASSERT(false && "Failed to destroy matcher");
+			};
+		};
+
+		template<typename Storage, typename T, typename... Args>
+		struct DestroyMatcher<Storage, TypeList<T, Args...>>
+		{
+			static void Destroy(Storage& _storage, const int _index)
+			{
+				if (_index == 0)
+				{
+					reinterpret_cast<T*>(&_storage.data)->~T();
+				}
+				else
+				{
+					DestroyMatcher<Storage, TypeList<Args...>>::Destroy(_storage, _index - 1);
+				}
+			}
+		};
+	};
+
+	template<typename... Args>
+	class Variant
+	{
+		private :
+			static constexpr size_t g_MaxSize = util::SizeOf<Args...>();
+			static constexpr size_t g_MaxAlign = util::AlignOf<Args...>();
+
+			using Types = util::TypeList<Args...>;
+			using Storage = util::AlignedStorage<g_MaxSize, g_MaxAlign>;
+
+		public :
+			Variant() 
+				: m_nCurrentIndex(-1)
+			{}
+
+			virtual ~Variant()
+			{
+				Destroy();
+			}
+
+			Variant(const Variant& _other)
+				: m_nCurrentIndex(-1)
+			{
+				Copy(_other);
+			}
+
+			Variant(Variant&& _other)
+				: m_nCurrentIndex(-1)
+			{
+				Move(std::move(_other));
+			}
+
+			template<typename T, typename = typename util::EnableIf<!util::IsSame<T, Variant>::Value>>
+			Variant(const T& _value)
+				: m_nCurrentIndex(-1)
+			{
+				Set(_value);
+			}
+
+			template<typename T, typename = typename util::EnableIf<!util::IsSame<T, Variant>::Value>>
+			Variant(T&& _value)
+				: m_nCurrentIndex(-1)
+			{
+				Set(std::move(_value));
+			}
+
+			Variant& operator=(const Variant& _other)
+			{
+				if (this != &_other)
+				{
+					Copy(_other);
+				}
+
+				return *this;
+			}
+
+			Variant& operator=(Variant&& _other)
+			{
+				if (this != &_other)
+				{
+					Move(std::move(_other));
+				}
+
+				return *this;
+			}
+
+			template<typename T, typename = typename util::EnableIf<!util::IsSame<T, Variant>::Value>>
+			Variant& operator=(const T& _value)
+			{
+				Set(_value);
+
+				return *this;
+			}
+
+			template<typename T, typename = typename util::EnableIf<!util::IsSame<T, Variant>::Value>>
+			Variant& operator=(T&& _value)
+			{
+				Set(std::move(_value));
+
+				return *this;
+			}
+
+		public:
+			template<typename T>
+			void Set(const T& _value)
+			{
+				constexpr int index = util::IndexOf<T, Args...>();
+				if (index != -1)
+				{
+					Destroy();
+					m_nCurrentIndex = index;
+					new (&m_tStorage.data) T(_value);
+				}
+				else
+				{
+					_VARIANT_ASSERT(false && "Failed to set value in Variant");
+				}
+			}
+
+			template<typename T>
+			void Set(T&& _value)
+			{
+				constexpr int index = util::IndexOf<T, Args...>();
+				if (index != -1)
+				{
+					Destroy();
+					m_nCurrentIndex = index;
+					new (&m_tStorage.data) T(std::move(_value));
+				}
+				else
+				{
+					_VARIANT_ASSERT(false && "Failed to set value in Variant");
+				}
+			}
+
+			template<typename T>
+			const T& Get() const
+			{
+				if (util::IndexOf<T, Args...>() == m_nCurrentIndex)
+				{
+					return *reinterpret_cast<const T*>(&m_tStorage.data);
+				}
+				else
+				{
+					_VARIANT_ASSERT(false && "Failed to get value from Variant");
+
+					static T emptyValue;
+					return emptyValue;
+				}
+			}
+
+			int GetIndex() const
+			{
+				return m_nCurrentIndex;
+			}
+
+			template<typename T>
+			const bool Is() const
+			{
+				return util::IndexOf<T, Args...>() == m_nCurrentIndex;
+			}
+
+			void Emplace(const Variant& _other)
+			{
+				if (this != &_other)
+				{
+					this->Copy(_other);
+				}
+			}
+
+			void Emplace(Variant&& _other)
+			{
+				if (this != &_other)
+				{
+					this->Move(std::move(_other));
+				}
+			}
+
+		private :
+			void Destroy()
+			{
+				if (m_nCurrentIndex != -1)
+				{
+					util::DestroyMatcher<Storage, Types>::Destroy(m_tStorage, m_nCurrentIndex);
+					m_nCurrentIndex = -1;
+				}
+			}
+
+			void Copy(const Variant& _other)
+			{
+				this->Destroy();
+				this->m_tStorage = _other.m_tStorage;
+				this->m_nCurrentIndex = _other.m_nCurrentIndex;
+			}
+
+			void Move(Variant&& _other)
+			{
+				this->Destroy();
+				this->m_tStorage = std::move(_other.m_tStorage);
+				this->m_nCurrentIndex = _other.m_nCurrentIndex;
+			}
+
+		private :
+			int m_nCurrentIndex;
+			Storage m_tStorage;
+	};
+};
+
+#endif // __WTR_VARIANT_H__
