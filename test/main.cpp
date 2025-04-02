@@ -73,6 +73,39 @@ int MAIN()
 		LOGINFO() << "Vector Value of Index 0 : " << var3.Get<std::vector<int>>()[0];
 	}
 
+	{
+		struct Object
+		{
+			std::shared_ptr<Object> spChild;
+			int Value;
+
+			Object()
+				: spChild(nullptr)
+				, Value(0)
+			{}
+
+			Object(const Object& _other)
+				: spChild(_other.spChild)
+				, Value(_other.Value)
+			{}
+		};
+
+		// Deep Copy Test
+		wtr::Variant<int, std::string, Object> var1;
+		wtr::Variant<int, std::string, Object> var2;
+		wtr::Variant<int, std::string, Object> var3;
+
+		var1.Set<std::string>("Hello World!");
+
+		var2 = var1;
+
+		LOGINFO() << "Copy String : " << var2.Get<std::string>();
+
+		var3 = std::move(var1);
+
+		LOGINFO() << "Move String : " << var2.Get<std::string>();
+	}
+
 	// var.Set(true);
 	// LOGINFO() << "Index : " << var.GetIndex();
 
