@@ -86,6 +86,10 @@ namespace wtr
 		{
 			bool valid;
 			alignas(Align) char data[Size];
+
+			AlignedStorage()
+				: valid(false)
+			{}
 		};
 	
 		template<typename... Args>
@@ -111,9 +115,19 @@ namespace wtr
 		template<typename... Ts>
 		struct TypeList {};
 
-		template<typename Storage, typename List>
-		struct DestroyMatcher
+		template<typename Storage, typename TypeList>
+		struct TypeMatcher
 		{
+			static void Move(Storage& _lhs, const Storage& _rhs, const int _index)
+			{
+				_VARIANT_ASSERT(false && "Failed to move matcher");				
+			}
+
+			static void Copy(Storage& _lhs, const Storage& _rhs, const int _index)
+			{
+				_VARIANT_ASSERT(false && "Failed to copy matcher");				
+			}
+
 			static void Destroy(Storage& _storage, const int _index) 
 			{
 				_VARIANT_ASSERT(false && "Failed to destroy matcher");
@@ -121,17 +135,62 @@ namespace wtr
 		};
 
 		template<typename Storage, typename T, typename... Args>
-		struct DestroyMatcher<Storage, TypeList<T, Args...>>
+		struct TypeMatcher<Storage, TypeList<T, Args...>>
 		{
+			static void Move(Storage& _lhs, Storage&& _rhs, const int _index)
+			{
+				if (_index == 0)
+				{
+					T& lhsValue = *reinterpret_cast<T*>(&_lhs.data);
+					T&& rhsValue = std::move(*reinterpret_cast<T*>(&_rhs.data));
+
+					if (!_lhs.valid)
+					{
+						new (&_lhs.data) T(rhsValue);
+					}
+					else
+					{
+						lhsValue = rhsValue;
+					}
+				}
+				else
+				{
+					TypeMatcher<Storage, TypeList<Args...>>::Move(_lhs, std::move(_rhs), _index - 1);
+				}
+			}
+
+			static void Copy(Storage& _lhs, const Storage& _rhs, const int _index)
+			{
+				if (_index == 0)
+				{
+					T& lhsValue = *reinterpret_cast<T*>(&_lhs.data);
+					const T& rhsValue = *reinterpret_cast<const T*>(&_rhs.data);
+
+					if (!_lhs.valid)
+					{
+						new (&_lhs.data) T(rhsValue);
+					}
+					else
+					{
+						lhsValue = rhsValue;
+					}
+				}
+				else
+				{
+					TypeMatcher<Storage, TypeList<Args...>>::Copy(_lhs, _rhs, _index - 1);
+				}
+			}
+
 			static void Destroy(Storage& _storage, const int _index)
 			{
 				if (_index == 0)
 				{
-					reinterpret_cast<T*>(&_storage.data)->~T();
+					const T& refValue = *reinterpret_cast<T*>(&_storage.data);
+					refValue.~T();
 				}
 				else
 				{
-					DestroyMatcher<Storage, TypeList<Args...>>::Destroy(_storage, _index - 1);
+					TypeMatcher<Storage, TypeList<Args...>>::Destroy(_storage, _index - 1);
 				}
 			}
 		};
@@ -300,23 +359,21 @@ namespace wtr
 			{
 				if (m_nCurrentIndex != -1)
 				{
-					util::DestroyMatcher<Storage, Types>::Destroy(m_tStorage, m_nCurrentIndex);
+					util::TypeMatcher<Storage, Types>::Destroy(m_tStorage, m_nCurrentIndex);
 					m_nCurrentIndex = -1;
 				}
 			}
 
 			void Copy(const Variant& _other)
 			{
-				this->Destroy();
-				this->m_tStorage = _other.m_tStorage;
 				this->m_nCurrentIndex = _other.m_nCurrentIndex;
+				util::TypeMatcher<Storage, Types>::Copy(m_tStorage, _other.m_tStorage, m_nCurrentIndex);
 			}
 
 			void Move(Variant&& _other)
 			{
-				this->Destroy();
-				this->m_tStorage = std::move(_other.m_tStorage);
 				this->m_nCurrentIndex = _other.m_nCurrentIndex;
+				util::TypeMatcher<Storage, Types>::Move(m_tStorage, std::move(_other.m_tStorage), m_nCurrentIndex);
 			}
 
 		private :
