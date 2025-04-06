@@ -12,7 +12,7 @@ namespace std
 {
 	template<typename T>
 	struct hash;
-}
+};
 
 namespace wtr
 {
