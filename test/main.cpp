@@ -6,6 +6,18 @@
 #include <vector>
 #include <unordered_set>
 
+namespace std
+{
+	template<typename... Args>
+	struct hash<wtr::Variant<Args...>>
+	{
+		size_t operator()(const wtr::Variant<Args...>& _variant) const
+		{
+			return _variant.GetHash();
+		}
+	};
+};
+
 int MAIN()
 {
 	Log::Init(1024, Log::Enum::eMode_Print | Log::Enum::eMode_Save, Log::Enum::eLevel_Type);
