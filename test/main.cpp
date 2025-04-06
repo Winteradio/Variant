@@ -4,6 +4,7 @@
 #include "Variant.h"
 
 #include <vector>
+#include <unordered_set>
 
 int MAIN()
 {
@@ -108,6 +109,32 @@ int MAIN()
 
 	// var.Set(true);
 	// LOGINFO() << "Index : " << var.GetIndex();
+
+	{
+		// Hash Test
+		wtr::Variant<int, float, double> var4, var5, var6, var7;
+		var4.Set(1.0f);
+		var5.Set(1.2f);
+		var6.Set(0.0f);
+		var7.Set(2.0f);
+
+		LOGINFO() << "Hash Value : " << var4.GetHash();
+		LOGINFO() << "Hash Value : " << var5.GetHash();
+		LOGINFO() << "Hash Value : " << var6.GetHash();
+		LOGINFO() << "Hash Value : " << var7.GetHash();
+
+		std::unordered_set<wtr::Variant<int, float, double>> set;
+
+		set.insert(var4);
+		set.insert(var5);
+		set.insert(var6);
+		set.insert(var7);
+
+		for (auto& iter : set)
+		{
+			LOGINFO() << "Value : " << iter.Get<float>() << " | Hash Value : " << iter.GetHash();
+		}
+	}
 
 	system("pause");
 

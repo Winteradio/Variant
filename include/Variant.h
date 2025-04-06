@@ -12,6 +12,9 @@ namespace wtr
 {
 	namespace util
 	{
+		template<typename...> 
+		using Void_t = void;
+
 		template<bool Condition, typename T>
 		struct EnableIf;
 
@@ -32,6 +35,12 @@ namespace wtr
 		{
 			static const bool Value = true;
 		};
+
+		template<typename T>
+		T&& Declval() noexcept
+		{
+			return static_cast<T&&>(*(T*)nullptr);
+		}
 	
 		template<typename... Args>
 		struct SizeCalculator 
@@ -187,11 +196,27 @@ namespace wtr
 				{
 					const T& refValue = *reinterpret_cast<T*>(&_storage.data);
 					refValue.~T();
+
+					_storage.valid = false;
 				}
 				else
 				{
 					TypeMatcher<Storage, TypeList<Args...>>::Destroy(_storage, _index - 1);
 				}
+			}
+		};
+		
+		template<typename T, typename = void>
+		struct HashMatcher {
+			static size_t GetHash(const T&) {
+				return 0;
+			}
+		};
+		
+		template<typename T>
+		struct HashMatcher<T, Void_t<decltype(std::hash<T>{}(Declval<T>()))>> {
+			static size_t GetHash(const T& _value) {
+				return std::hash<T>{}(_value);
 			}
 		};
 	};
@@ -209,6 +234,7 @@ namespace wtr
 		public :
 			Variant() 
 				: m_nCurrentIndex(-1)
+				, m_nCurrentHash(0)
 			{}
 
 			virtual ~Variant()
@@ -278,6 +304,19 @@ namespace wtr
 				return *this;
 			}
 
+			bool operator==(const Variant& _other) const
+			{
+				if (this != &_other)
+				{
+					if (m_nCurrentIndex == _other.m_nCurrentIndex)
+					{
+						return m_nCurrentHash == _other.m_nCurrentHash;
+					}
+				}
+
+				return false;
+			}
+
 		public:
 			template<typename T>
 			void Set(const T& _value)
@@ -288,6 +327,8 @@ namespace wtr
 					Destroy();
 					m_nCurrentIndex = index;
 					new (&m_tStorage.data) T(_value);
+
+					m_nCurrentHash = util::HashMatcher<T>::GetHash(_value);
 				}
 				else
 				{
@@ -304,6 +345,8 @@ namespace wtr
 					Destroy();
 					m_nCurrentIndex = index;
 					new (&m_tStorage.data) T(std::move(_value));
+
+					m_nCurrentHash = util::HashMatcher<T>::GetHash(_value);
 				}
 				else
 				{
@@ -327,9 +370,14 @@ namespace wtr
 				}
 			}
 
-			int GetIndex() const
+			const int GetIndex() const
 			{
 				return m_nCurrentIndex;
+			}
+
+			const size_t GetHash() const
+			{
+				return m_nCurrentHash;
 			}
 
 			template<typename T>
@@ -361,24 +409,40 @@ namespace wtr
 				{
 					util::TypeMatcher<Storage, Types>::Destroy(m_tStorage, m_nCurrentIndex);
 					m_nCurrentIndex = -1;
+					m_nCurrentHash = 0;
 				}
 			}
 
 			void Copy(const Variant& _other)
 			{
 				this->m_nCurrentIndex = _other.m_nCurrentIndex;
+				this->m_nCurrentHash = _other.m_nCurrentHash;
 				util::TypeMatcher<Storage, Types>::Copy(m_tStorage, _other.m_tStorage, m_nCurrentIndex);
 			}
 
 			void Move(Variant&& _other)
 			{
 				this->m_nCurrentIndex = _other.m_nCurrentIndex;
+				this->m_nCurrentHash = _other.m_nCurrentHash;
 				util::TypeMatcher<Storage, Types>::Move(m_tStorage, std::move(_other.m_tStorage), m_nCurrentIndex);
 			}
 
 		private :
 			int m_nCurrentIndex;
+			size_t m_nCurrentHash;
 			Storage m_tStorage;
+	};
+};
+
+namespace std
+{
+	template<typename... Args>
+	struct hash<wtr::Variant<Args...>>
+	{
+		size_t operator()(const wtr::Variant<Args...>& _variant) const
+		{
+			return _variant.GetHash();
+		}
 	};
 };
 
