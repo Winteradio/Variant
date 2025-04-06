@@ -8,6 +8,12 @@
 	#define _VARIANT_ASSERT(x)
 #endif
 
+namespace std
+{
+	template<typename T>
+	struct hash;
+};
+
 namespace wtr
 {
 	namespace util
@@ -437,6 +443,18 @@ namespace wtr
 			int m_nCurrentIndex;
 			size_t m_nCurrentHash;
 			Storage m_tStorage;
+	};
+};
+
+namespace std
+{
+	template<typename... Args>
+	struct hash<wtr::Variant<Args...>>
+	{
+		size_t operator()(const wtr::Variant<Args...>& _variant) const
+		{
+			return _variant.GetHash();
+		}
 	};
 };
 

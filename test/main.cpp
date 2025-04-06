@@ -1,22 +1,10 @@
+#include "Variant.h"
+
 #include <LogProject/Log.h>
 #include <LogProject/LogPlatform.h>
 
-#include "Variant.h"
-
 #include <vector>
 #include <unordered_set>
-
-namespace std
-{
-	template<typename... Args>
-	struct hash<wtr::Variant<Args...>>
-	{
-		size_t operator()(const wtr::Variant<Args...>& _variant) const
-		{
-			return _variant.GetHash();
-		}
-	};
-};
 
 int MAIN()
 {
