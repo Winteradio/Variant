@@ -134,6 +134,22 @@ int MAIN()
 		{
 			LOGINFO() << "Value : " << iter.Get<float>() << " | Hash Value : " << iter.GetHash();
 		}
+
+		struct Object
+		{
+			using ObjectList = std::vector<std::shared_ptr<Object>>;
+			using Value = wtr::Variant<bool, int, float, double, std::string, ObjectList>;
+
+			Object() {};
+
+			Value m_Value;
+		};
+
+		wtr::Variant<std::string, int, Object, std::vector<float>> var8, var9;
+		var8.Set(std::string("Hello World!"));
+		var9.Set(Object());
+		LOGINFO() << "Hash Value : " << var8.GetHash();
+		LOGINFO() << "Hash Value : " << var9.GetHash();
 	}
 
 	system("pause");

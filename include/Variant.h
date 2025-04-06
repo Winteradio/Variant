@@ -415,16 +415,22 @@ namespace wtr
 
 			void Copy(const Variant& _other)
 			{
-				this->m_nCurrentIndex = _other.m_nCurrentIndex;
-				this->m_nCurrentHash = _other.m_nCurrentHash;
-				util::TypeMatcher<Storage, Types>::Copy(m_tStorage, _other.m_tStorage, m_nCurrentIndex);
+				if (_other.m_nCurrentIndex != -1)
+				{
+					this->m_nCurrentIndex = _other.m_nCurrentIndex;
+					this->m_nCurrentHash = _other.m_nCurrentHash;
+					util::TypeMatcher<Storage, Types>::Copy(m_tStorage, _other.m_tStorage, m_nCurrentIndex);
+				}
 			}
 
 			void Move(Variant&& _other)
 			{
-				this->m_nCurrentIndex = _other.m_nCurrentIndex;
-				this->m_nCurrentHash = _other.m_nCurrentHash;
-				util::TypeMatcher<Storage, Types>::Move(m_tStorage, std::move(_other.m_tStorage), m_nCurrentIndex);
+				if (_other.m_nCurrentIndex != -1)
+				{
+					this->m_nCurrentIndex = _other.m_nCurrentIndex;
+					this->m_nCurrentHash = _other.m_nCurrentHash;
+					util::TypeMatcher<Storage, Types>::Move(m_tStorage, std::move(_other.m_tStorage), m_nCurrentIndex);
+				}
 			}
 
 		private :
