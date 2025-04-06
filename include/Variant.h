@@ -440,16 +440,4 @@ namespace wtr
 	};
 };
 
-namespace std
-{
-	template<typename... Args>
-	struct hash<wtr::Variant<Args...>>
-	{
-		size_t operator()(const wtr::Variant<Args...>& _variant) const
-		{
-			return _variant.GetHash();
-		}
-	};
-};
-
 #endif // __WTR_VARIANT_H__
