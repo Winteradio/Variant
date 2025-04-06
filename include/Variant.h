@@ -333,10 +333,11 @@ namespace wtr
 				if (index != -1)
 				{
 					Destroy();
-					m_nCurrentIndex = index;
-					new (&m_tStorage.data) T(_value);
 
+					m_nCurrentIndex = index;
 					m_nCurrentHash = util::HashMatcher<T>::GetHash(_value);
+					
+					new (&m_tStorage.data) T(_value);
 				}
 				else
 				{
@@ -351,10 +352,11 @@ namespace wtr
 				if (index != -1)
 				{
 					Destroy();
-					m_nCurrentIndex = index;
-					new (&m_tStorage.data) T(std::move(_value));
 
+					m_nCurrentIndex = index;
 					m_nCurrentHash = util::HashMatcher<T>::GetHash(_value);
+
+					new (&m_tStorage.data) T(std::move(_value));
 				}
 				else
 				{
