@@ -166,6 +166,7 @@ namespace wtr
 					else
 					{
 						lhsValue = rhsValue;
+						_lhs.data.valid = _rhs.data.valid;
 					}
 				}
 				else
@@ -188,6 +189,7 @@ namespace wtr
 					else
 					{
 						lhsValue = rhsValue;
+						_lhs.data.valid = _rhs.data.valid;
 					}
 				}
 				else
